@@ -5,13 +5,14 @@
 import { Bot } from 'grammy';
 import { logger } from '../utils/logger.js';
 import { authMiddleware } from './middleware/auth.middleware.js';
+import { rateLimitMiddleware } from './middleware/rate-limit.middleware.js';
 import {
   handleStart,
   handleHelp,
   handleClear,
   handleStatus,
 } from './handlers/command.handler.js';
-import { handleMessage } from './handlers/message.handler.js';
+import { handleMessageWithTools } from './handlers/message-with-tools.handler.js';
 
 let bot: Bot | null = null;
 
@@ -32,6 +33,9 @@ export function createBot(): Bot {
 
   bot = new Bot(token);
 
+  // Apply rate limiting middleware BEFORE auth (to protect auth checks)
+  bot.use(rateLimitMiddleware);
+
   // Apply authentication middleware to all updates
   bot.use(authMiddleware);
 
@@ -41,8 +45,8 @@ export function createBot(): Bot {
   bot.command('clear', handleClear);
   bot.command('status', handleStatus);
 
-  // Register message handler for text messages
-  bot.on('message:text', handleMessage);
+  // Register message handler for text messages (with Airtable tool support)
+  bot.on('message:text', handleMessageWithTools);
 
   // Error handler for bot errors
   bot.catch((err) => {

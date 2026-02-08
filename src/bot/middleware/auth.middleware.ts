@@ -6,6 +6,8 @@
 import { Context, NextFunction } from 'grammy';
 import { logger } from '../../utils/logger.js';
 import { getVerifiedUser, updateLastActive } from '../../db/repositories/memory.repository.js';
+import { auditAuthSuccess, auditAuthFailure } from '../../db/repositories/audit.repository.js';
+import { monitoringService } from '../../services/monitoring.service.js';
 
 /**
  * Middleware to verify user is authorized
@@ -31,6 +33,16 @@ export async function authMiddleware(ctx: Context, next: NextFunction): Promise<
         firstName: ctx.from?.first_name,
       });
 
+      // Audit log authentication failure
+      await auditAuthFailure(
+        userId,
+        ctx.from?.username || undefined,
+        'User not in verified_users table'
+      );
+
+      // Monitor: auth failure
+      monitoringService.incrementCounter('auth_failures');
+
       await ctx.reply(
         "Sorry, you're not authorized to use this bot. Please contact the administrator."
       );
@@ -39,6 +51,9 @@ export async function authMiddleware(ctx: Context, next: NextFunction): Promise<
 
     // User is verified, update last active timestamp
     await updateLastActive(userId);
+
+    // Audit log authentication success
+    await auditAuthSuccess(userId, verifiedUser.telegramUsername || undefined);
 
     logger.debug('User authenticated', {
       userId,

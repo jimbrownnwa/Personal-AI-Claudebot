@@ -21,6 +21,7 @@
   "license": "ISC",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.74.0",
+    "@modelcontextprotocol/sdk": "^1.26.0",
     "@supabase/supabase-js": "^2.95.3",
     "dotenv": "^17.2.4",
     "grammy": "^1.39.3",

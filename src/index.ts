@@ -11,6 +11,8 @@ import {
 } from './utils/error-handler.js';
 import { checkSupabaseConnection, closeSupabaseConnection } from './db/supabase.client.js';
 import { startBot, stopBot, getBotInfo } from './bot/bot.js';
+import { initializeAirtableMCP, closeAirtableMCP } from './services/airtable.service.js';
+import { monitoringService } from './services/monitoring.service.js';
 
 // Load environment variables
 dotenv.config();
@@ -63,6 +65,14 @@ async function main(): Promise<void> {
       throw new Error('Failed to connect to Supabase. Please check your configuration.');
     }
 
+    // Initialize Airtable MCP (optional - continues if not configured)
+    logger.info('Initializing Airtable MCP...');
+    await initializeAirtableMCP();
+
+    // Start monitoring service
+    logger.info('Starting monitoring service...');
+    monitoringService.start();
+
     // Get bot info
     const botInfo = await getBotInfo();
     logger.info('Bot verified', {
@@ -74,7 +84,9 @@ async function main(): Promise<void> {
     // Setup graceful shutdown
     setupGracefulShutdown(async () => {
       logger.info('Cleaning up...');
+      monitoringService.stop();
       await stopBot();
+      await closeAirtableMCP();
       closeSupabaseConnection();
     });
 

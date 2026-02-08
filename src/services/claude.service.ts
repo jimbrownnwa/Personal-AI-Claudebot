@@ -12,7 +12,7 @@ let anthropicClient: Anthropic | null = null;
 /**
  * Initialize Anthropic client
  */
-function getAnthropicClient(): Anthropic {
+export function getAnthropicClient(): Anthropic {
   if (anthropicClient) {
     return anthropicClient;
   }
@@ -33,17 +33,24 @@ function getAnthropicClient(): Anthropic {
 /**
  * Build system prompt with context
  */
-function buildSystemPrompt(context: ConversationContext): string {
-  let systemPrompt = `You are a helpful personal AI assistant. You have access to the user's conversation history and past memories to provide context-aware, personalized responses.
+function buildSystemPrompt(context: ConversationContext, hasTools: boolean = false): string {
+  let systemPrompt = `You are a helpful personal AI assistant named Radar. You have access to the user's conversation history and past memories to provide context-aware, personalized responses.
 
 Your role is to:
 - Be helpful, friendly, and professional
 - Remember user preferences and past conversations
 - Provide accurate and thoughtful responses
 - Ask clarifying questions when needed
-- Admit when you don't know something
+- Admit when you don't know something`;
 
-Current conversation context is provided below.`;
+  if (hasTools) {
+    systemPrompt += `
+- Use available tools to help manage projects and tasks in Airtable
+- When asked to add, update, or query tasks/projects, use the Airtable tools
+- Confirm actions after executing them`;
+  }
+
+  systemPrompt += '\n\nCurrent conversation context is provided below.';
 
   // Add semantic memories if available
   if (context.semanticMemories.length > 0) {
