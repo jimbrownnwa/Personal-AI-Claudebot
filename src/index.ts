@@ -3,22 +3,27 @@
  * A persistent AI assistant with Claude as the brain, accessible via Telegram
  */
 
+// CRITICAL: Load environment variables FIRST, before any other imports
 import dotenv from 'dotenv';
+const dotenvResult = dotenv.config();
+console.log('[DOTENV DEBUG] Result:', dotenvResult.error ? `ERROR: ${dotenvResult.error.message}` : 'SUCCESS');
+console.log('[DOTENV DEBUG] OPENWEATHER_API_KEY loaded?', process.env.OPENWEATHER_API_KEY ? 'YES (length: ' + process.env.OPENWEATHER_API_KEY.length + ')' : 'NO');
+console.log('[DOTENV DEBUG] PERPLEXITY_API_KEY loaded?', process.env.PERPLEXITY_API_KEY ? 'YES (length: ' + process.env.PERPLEXITY_API_KEY.length + ')' : 'NO');
+
+// Now import everything else
 import { logger } from './utils/logger.js';
 import {
   setupGlobalErrorHandlers,
   setupGracefulShutdown,
 } from './utils/error-handler.js';
 import { checkSupabaseConnection, closeSupabaseConnection } from './db/supabase.client.js';
-import { startBot, stopBot, getBotInfo } from './bot/bot.js';
+import { startBot, stopBot, getBotInfo, getBotInstance } from './bot/bot.js';
 import { initializeAirtableMCP, closeAirtableMCP } from './services/airtable.service.js';
 import { initializeGoogleMCP, closeGoogleMCP } from './services/google.service.js';
 import { initializeGoogleAPI } from './services/google-api.service.js';
 import { initializeGitHubMCP, closeGitHubMCP } from './services/github.service.js';
 import { monitoringService } from './services/monitoring.service.js';
-
-// Load environment variables
-dotenv.config();
+import { initializeScheduledTasks, stopScheduledTasks } from './services/scheduled-tasks.service.js';
 
 /**
  * Verify all required environment variables are set
@@ -96,9 +101,15 @@ async function main(): Promise<void> {
       name: botInfo.firstName,
     });
 
+    // Initialize scheduled tasks (morning briefing, etc.) BEFORE starting bot
+    logger.info('Initializing scheduled tasks...');
+    const bot = getBotInstance();
+    initializeScheduledTasks(bot);
+
     // Setup graceful shutdown
     setupGracefulShutdown(async () => {
       logger.info('Cleaning up...');
+      stopScheduledTasks();
       monitoringService.stop();
       await stopBot();
       await closeAirtableMCP();
@@ -107,12 +118,14 @@ async function main(): Promise<void> {
       closeSupabaseConnection();
     });
 
-    // Start the bot
-    await startBot();
-
     logger.info('✅ Personal AI Assistant is running!', {
       botUsername: botInfo.username,
+      scheduledTasks: 'Morning briefing at 7:00 AM Central',
     });
+    logger.info('Press Ctrl+C to stop');
+
+    // Start the bot (this blocks, so must be last)
+    await startBot();
     logger.info('Press Ctrl+C to stop');
   } catch (error) {
     logger.error('Failed to start application', error as Error);

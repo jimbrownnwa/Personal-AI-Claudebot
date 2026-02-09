@@ -6,6 +6,8 @@ import { CommandContext, Context } from 'grammy';
 import { logger } from '../../utils/logger.js';
 import { clearHistory, getMessageCount } from '../../db/repositories/chat.repository.js';
 import { getMemoryCount } from '../../db/repositories/memory.repository.js';
+import { sendMorningBriefing } from '../../services/morning-briefing.service.js';
+import { getBotInstance } from '../bot.js';
 
 /**
  * Handle /start command
@@ -25,6 +27,7 @@ I'm here to help you with intelligent, context-aware conversations. I remember o
 /help - Show this help message
 /clear - Clear conversation history
 /status - Show statistics
+/briefing - Get your morning briefing now
 
 Feel free to message me anything, and I'll do my best to assist you!`;
 
@@ -47,6 +50,7 @@ export async function handleHelp(ctx: CommandContext<Context>): Promise<void> {
 /help - Display this help message
 /clear - Clear your conversation history (semantic memories are retained)
 /status - Show statistics about your conversations
+/briefing - Manually trigger morning briefing (calendar, weather, news)
 
 **How to Use:**
 Just send me a message as you would in any chat. I'll:
@@ -58,6 +62,8 @@ Just send me a message as you would in any chat. I'll:
 ✓ Persistent memory across sessions
 ✓ Semantic search of past conversations
 ✓ Intelligent context awareness
+✓ Daily morning briefing (7 AM Central)
+✓ Google Calendar integration
 ✓ Secure and private (only authorized users)
 
 Need more help? Just ask me anything!`;
@@ -118,5 +124,31 @@ Semantic memories are important exchanges that I remember for context in future 
   } catch (error) {
     logger.error('Error in /status command', error as Error);
     await ctx.reply('An error occurred while fetching statistics. Please try again.');
+  }
+}
+
+/**
+ * Handle /briefing command - Manually trigger morning briefing
+ */
+export async function handleBriefing(ctx: CommandContext<Context>): Promise<void> {
+  try {
+    const userId = ctx.from?.id;
+    if (!userId) return;
+
+    logger.info('User requested manual briefing', { userId });
+
+    await ctx.reply('📰 Generating your morning briefing... This may take a moment.');
+
+    try {
+      const bot = getBotInstance();
+      await sendMorningBriefing(bot);
+      logger.info('Manual briefing sent successfully', { userId });
+    } catch (error) {
+      logger.error('Failed to send manual briefing', error as Error);
+      await ctx.reply('❌ Failed to generate briefing. Please check the logs and ensure API keys are configured.');
+    }
+  } catch (error) {
+    logger.error('Error in /briefing command', error as Error);
+    await ctx.reply('An error occurred. Please try again.');
   }
 }

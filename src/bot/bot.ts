@@ -11,6 +11,7 @@ import {
   handleHelp,
   handleClear,
   handleStatus,
+  handleBriefing,
 } from './handlers/command.handler.js';
 import { handleMessageWithTools } from './handlers/message-with-tools.handler.js';
 
@@ -44,6 +45,7 @@ export function createBot(): Bot {
   bot.command('help', handleHelp);
   bot.command('clear', handleClear);
   bot.command('status', handleStatus);
+  bot.command('briefing', handleBriefing);
 
   // Register message handler for text messages (with Airtable tool support)
   bot.on('message:text', handleMessageWithTools);
@@ -99,4 +101,14 @@ export async function getBotInfo(): Promise<{
     username: me.username,
     firstName: me.first_name,
   };
+}
+
+/**
+ * Get the bot instance (for scheduled tasks and other services)
+ */
+export function getBotInstance(): Bot {
+  if (!bot) {
+    throw new Error('Bot not initialized. Call createBot() first.');
+  }
+  return bot;
 }

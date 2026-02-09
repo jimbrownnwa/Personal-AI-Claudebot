@@ -30,6 +30,11 @@ import {
   getGitHubTools,
   executeGitHubTool,
 } from '../../services/github.service.js';
+import {
+  isPerplexityAvailable,
+  getPerplexityTools,
+  executePerplexityTool,
+} from '../../services/perplexity.service.js';
 import { validateUserInput } from '../../services/input-validation.service.js';
 import {
   auditMessageReceived,
@@ -118,13 +123,14 @@ function splitLongMessage(text: string, maxLength: number = MAX_TELEGRAM_MESSAGE
 /**
  * Build system prompt with tool awareness
  */
-function buildSystemPrompt(hasAirtable: boolean, hasGoogle: boolean, hasGitHub: boolean, hasGoogleAPI: boolean): string {
+function buildSystemPrompt(hasAirtable: boolean, hasGoogle: boolean, hasGitHub: boolean, hasGoogleAPI: boolean, hasPerplexity: boolean): string {
   let prompt = `You are Radar, a helpful personal AI assistant.`;
 
   const tools = [];
   if (hasAirtable) tools.push('Airtable for project and task management');
   if (hasGoogle || hasGoogleAPI) tools.push('Gmail and Google Drive');
   if (hasGitHub) tools.push('GitHub for repository management');
+  if (hasPerplexity) tools.push('web search via Perplexity AI');
 
   if (tools.length > 0) {
     prompt += ` You have access to ${tools.join(', ')}.
@@ -135,7 +141,8 @@ When using these tools:
 - Confirm actions after executing them
 - For Gmail: help read, search, compose, and send emails
 - For Drive: help manage files, create docs/sheets, search content
-- For GitHub: help browse repos, create issues, manage pull requests`;
+- For GitHub: help browse repos, create issues, manage pull requests
+- For web search: use Perplexity to find current information, news, and real-time data`;
   }
 
   return prompt;
@@ -213,11 +220,13 @@ export async function handleMessageWithTools(ctx: Context): Promise<void> {
     const hasGoogle = isGoogleAvailable();
     const hasGoogleAPI = isGoogleAPIAvailable();
     const hasGitHub = isGitHubAvailable();
+    const hasPerplexity = isPerplexityAvailable();
     const tools = [
       ...(hasAirtable ? getAirtableTools() : []),
       ...(hasGoogle ? getGoogleTools() : []),
       ...(hasGoogleAPI ? getGoogleAPITools() : []),
       ...(hasGitHub ? getGitHubTools() : []),
+      ...(hasPerplexity ? getPerplexityTools() : []),
     ];
 
     // Build messages for Claude
@@ -238,7 +247,7 @@ export async function handleMessageWithTools(ctx: Context): Promise<void> {
     });
 
     const client = getAnthropicClient();
-    const systemPrompt = buildSystemPrompt(hasAirtable, hasGoogle, hasGitHub, hasGoogleAPI);
+    const systemPrompt = buildSystemPrompt(hasAirtable, hasGoogle, hasGitHub, hasGoogleAPI, hasPerplexity);
 
     logger.debug('Calling Claude with tools', {
       toolCount: tools.length,
@@ -296,7 +305,9 @@ export async function handleMessageWithTools(ctx: Context): Promise<void> {
 
           // Determine which service owns this tool and execute accordingly
           let result;
-          if (hasGitHub && getGitHubTools().some(t => t.name === toolUse.name)) {
+          if (hasPerplexity && getPerplexityTools().some(t => t.name === toolUse.name)) {
+            result = await executePerplexityTool(toolUse.name, toolUse.input);
+          } else if (hasGitHub && getGitHubTools().some(t => t.name === toolUse.name)) {
             result = await executeGitHubTool(toolUse.name, toolUse.input, userId);
           } else if (hasGoogleAPI && getGoogleAPITools().some(t => t.name === toolUse.name)) {
             result = await executeGoogleAPITool(toolUse.name, toolUse.input, userId);
