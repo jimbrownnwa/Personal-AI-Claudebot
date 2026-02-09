@@ -3,6 +3,10 @@
 .env.local
 .env.*.local
 
+# Google OAuth credentials and tokens (sensitive)
+credentials.json
+google-token.json
+
 # Dependencies
 node_modules/
 
@@ -28,6 +32,7 @@ yarn-error.log*
 # OS
 .DS_Store
 Thumbs.db
+nul
 
 # TypeScript
 *.tsbuildinfo

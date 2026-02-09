@@ -8,7 +8,8 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "google-auth": "tsx scripts/google-auth.ts"
   },
   "keywords": [
     "telegram",
@@ -21,10 +22,13 @@
   "license": "ISC",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.74.0",
+    "@google-cloud/local-auth": "^3.0.1",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "@supabase/supabase-js": "^2.95.3",
     "dotenv": "^17.2.4",
+    "googleapis": "^171.4.0",
     "grammy": "^1.39.3",
+    "open": "^11.0.0",
     "openai": "^6.18.0"
   },
   "devDependencies": {

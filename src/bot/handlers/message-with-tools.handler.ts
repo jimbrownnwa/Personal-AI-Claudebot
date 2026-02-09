@@ -15,6 +15,21 @@ import {
   getAirtableTools,
   executeAirtableTool,
 } from '../../services/airtable.service.js';
+import {
+  isGoogleAvailable,
+  getGoogleTools,
+  executeGoogleTool,
+} from '../../services/google.service.js';
+import {
+  isGoogleAPIAvailable,
+  getGoogleAPITools,
+  executeGoogleAPITool,
+} from '../../services/google-api.service.js';
+import {
+  isGitHubAvailable,
+  getGitHubTools,
+  executeGitHubTool,
+} from '../../services/github.service.js';
 import { validateUserInput } from '../../services/input-validation.service.js';
 import {
   auditMessageReceived,
@@ -101,18 +116,26 @@ function splitLongMessage(text: string, maxLength: number = MAX_TELEGRAM_MESSAGE
 }
 
 /**
- * Build system prompt with Airtable awareness
+ * Build system prompt with tool awareness
  */
-function buildSystemPrompt(hasAirtable: boolean): string {
+function buildSystemPrompt(hasAirtable: boolean, hasGoogle: boolean, hasGitHub: boolean, hasGoogleAPI: boolean): string {
   let prompt = `You are Radar, a helpful personal AI assistant.`;
 
-  if (hasAirtable) {
-    prompt += ` You have access to Airtable for project and task management.
+  const tools = [];
+  if (hasAirtable) tools.push('Airtable for project and task management');
+  if (hasGoogle || hasGoogleAPI) tools.push('Gmail and Google Drive');
+  if (hasGitHub) tools.push('GitHub for repository management');
 
-When working with Airtable:
-- Use the available tools to interact with the user's Airtable base
+  if (tools.length > 0) {
+    prompt += ` You have access to ${tools.join(', ')}.
+
+When using these tools:
+- Use the available tools to help the user
 - Be specific about what you've done
-- Confirm actions after executing them`;
+- Confirm actions after executing them
+- For Gmail: help read, search, compose, and send emails
+- For Drive: help manage files, create docs/sheets, search content
+- For GitHub: help browse repos, create issues, manage pull requests`;
   }
 
   return prompt;
@@ -185,9 +208,17 @@ export async function handleMessageWithTools(ctx: Context): Promise<void> {
     // Build context
     const context = await buildContext(userId, sanitizedMessage);
 
-    // Get tools
+    // Get tools from all available sources
     const hasAirtable = isAirtableAvailable();
-    const tools = hasAirtable ? getAirtableTools() : [];
+    const hasGoogle = isGoogleAvailable();
+    const hasGoogleAPI = isGoogleAPIAvailable();
+    const hasGitHub = isGitHubAvailable();
+    const tools = [
+      ...(hasAirtable ? getAirtableTools() : []),
+      ...(hasGoogle ? getGoogleTools() : []),
+      ...(hasGoogleAPI ? getGoogleAPITools() : []),
+      ...(hasGitHub ? getGitHubTools() : []),
+    ];
 
     // Build messages for Claude
     const messages: Anthropic.MessageParam[] = [];
@@ -207,7 +238,7 @@ export async function handleMessageWithTools(ctx: Context): Promise<void> {
     });
 
     const client = getAnthropicClient();
-    const systemPrompt = buildSystemPrompt(hasAirtable);
+    const systemPrompt = buildSystemPrompt(hasAirtable, hasGoogle, hasGitHub, hasGoogleAPI);
 
     logger.debug('Calling Claude with tools', {
       toolCount: tools.length,
@@ -263,7 +294,19 @@ export async function handleMessageWithTools(ctx: Context): Promise<void> {
             toolInput: toolUse.input,
           });
 
-          const result = await executeAirtableTool(toolUse.name, toolUse.input, userId);
+          // Determine which service owns this tool and execute accordingly
+          let result;
+          if (hasGitHub && getGitHubTools().some(t => t.name === toolUse.name)) {
+            result = await executeGitHubTool(toolUse.name, toolUse.input, userId);
+          } else if (hasGoogleAPI && getGoogleAPITools().some(t => t.name === toolUse.name)) {
+            result = await executeGoogleAPITool(toolUse.name, toolUse.input, userId);
+          } else if (hasGoogle && getGoogleTools().some(t => t.name === toolUse.name)) {
+            result = await executeGoogleTool(toolUse.name, toolUse.input, userId);
+          } else if (hasAirtable && getAirtableTools().some(t => t.name === toolUse.name)) {
+            result = await executeAirtableTool(toolUse.name, toolUse.input, userId);
+          } else {
+            throw new Error(`Unknown tool: ${toolUse.name}`);
+          }
 
           const resultContent = Array.isArray(result.content)
             ? result.content.map((c: any) => c.text || JSON.stringify(c)).join('\n')

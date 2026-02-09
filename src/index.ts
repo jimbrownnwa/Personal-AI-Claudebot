@@ -12,6 +12,9 @@ import {
 import { checkSupabaseConnection, closeSupabaseConnection } from './db/supabase.client.js';
 import { startBot, stopBot, getBotInfo } from './bot/bot.js';
 import { initializeAirtableMCP, closeAirtableMCP } from './services/airtable.service.js';
+import { initializeGoogleMCP, closeGoogleMCP } from './services/google.service.js';
+import { initializeGoogleAPI } from './services/google-api.service.js';
+import { initializeGitHubMCP, closeGitHubMCP } from './services/github.service.js';
 import { monitoringService } from './services/monitoring.service.js';
 
 // Load environment variables
@@ -69,6 +72,18 @@ async function main(): Promise<void> {
     logger.info('Initializing Airtable MCP...');
     await initializeAirtableMCP();
 
+    // Initialize Google Workspace MCP (optional - continues if not configured)
+    logger.info('Initializing Google Workspace MCP...');
+    await initializeGoogleMCP();
+
+    // Initialize Google API (Direct OAuth integration)
+    logger.info('Initializing Google API...');
+    await initializeGoogleAPI();
+
+    // Initialize GitHub MCP (optional - continues if not configured)
+    logger.info('Initializing GitHub MCP...');
+    await initializeGitHubMCP();
+
     // Start monitoring service
     logger.info('Starting monitoring service...');
     monitoringService.start();
@@ -87,6 +102,8 @@ async function main(): Promise<void> {
       monitoringService.stop();
       await stopBot();
       await closeAirtableMCP();
+      await closeGoogleMCP();
+      await closeGitHubMCP();
       closeSupabaseConnection();
     });
 
